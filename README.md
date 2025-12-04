@@ -26,7 +26,7 @@ Bestdori 场景背景图下载工具。
 
 ```bash
 git clone https://github.com/Yulinanami/Bestdori_bg_imgDownload
-cd Bestdori_bg_imgDownload
+cd Bestdori_BG_ImgDownload
 ```
 
 ### 2. 创建并激活虚拟环境
