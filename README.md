@@ -34,6 +34,8 @@ cd Bestdori_bg_imgDownload
 ```bash
 # 创建虚拟环境
 python -m venv .venv
+# 或
+python3 -m venv .venv
 
 # 激活虚拟环境 (Windows)
 .\.venv\Scripts\activate
