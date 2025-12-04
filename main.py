@@ -1,12 +1,9 @@
-# main.py
-import tkinter as tk
-from gui_app import BestdoriApp
+from modern_gui import BestdoriAppModern
 
 
 def main():
-    root = tk.Tk()
-    app = BestdoriApp(root)
-    root.mainloop()
+    app = BestdoriAppModern()
+    app.mainloop()
 
 
 if __name__ == "__main__":
