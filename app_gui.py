@@ -286,6 +286,7 @@ class BestdoriAppModern(ctk.CTk):
 
         conc = int(self.conc_var.get())
         batch_size = int(self.batch_var.get())
+        retry_attempts = 3  # 固定重试 3 轮
 
         # 重置统计
         self.stats = DownloadStats()
@@ -308,6 +309,7 @@ class BestdoriAppModern(ctk.CTk):
         self.log("=== 开始任务 ===")
         self.log(f"保存目录: {output_dir}")
         self.log(f"并发数: {conc}，每批扫描 {batch_size} 个 scenario")
+        self.log(f"扫描失败的 scenario 会在结束后自动重试 {retry_attempts} 轮")
 
         # 启动下载线程
         self.download_thread = threading.Thread(
@@ -329,7 +331,7 @@ class BestdoriAppModern(ctk.CTk):
         # 启动扫描线程
         self.scan_thread = threading.Thread(
             target=self._scan_worker,
-            args=(output_dir, batch_size),
+            args=(output_dir, batch_size, retry_attempts),
             daemon=True,
         )
         self.scan_thread.start()
@@ -375,7 +377,7 @@ class BestdoriAppModern(ctk.CTk):
             self.progressbar.set(scanned / total)
         self.lbl_status.configure(text=f"已扫描 {scanned}/{total} 个 scenario")
 
-    def _scan_worker(self, output_dir, batch_size):
+    def _scan_worker(self, output_dir, batch_size, retry_attempts):
         from scanner import scan_all_scenarios 
 
         try:
@@ -387,6 +389,7 @@ class BestdoriAppModern(ctk.CTk):
                 self._update_progress,
                 stats=self.stats,
                 stop_event=self.stop_event,
+                retry_attempts=retry_attempts,
             ):
                 if self.stop_event.is_set():
                     break
