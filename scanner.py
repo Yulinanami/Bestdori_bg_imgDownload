@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from common import BG_LIST_URL, HEADERS, wait_if_paused_sync
 from stats import DownloadStats
@@ -12,6 +13,7 @@ def scan_all_scenarios(
     log,
     update_progress,
     stats: DownloadStats | None = None,
+    stop_event: threading.Event | None = None,
 ):
     """
     分批扫描：
@@ -47,11 +49,22 @@ def scan_all_scenarios(
         log(str(scenarios))
 
         scanned = 0
+        collected = 0
         batch_map = {}
 
+        def _tick_progress():
+            nonlocal scanned
+            scanned += 1
+            if update_progress:
+                update_progress(scanned, total)
+
         for scen in scenarios:
+            if stop_event is not None and stop_event.is_set():
+                log("[info] 检测到停止信号，结束扫描")
+                break
+
             wait_if_paused_sync(pause_event)
-            time.sleep(0.5)  # 每个 scenario 间隔 0.5s
+            time.sleep(0.5)  # 每个 scenario 间隔 0.5s，降低对 Bestdori 服务器的压力
 
             url = f"{BG_LIST_URL}/{scen}"
             log(f"\n[+] 扫描 {scen} -> {url}")
@@ -69,17 +82,20 @@ def scan_all_scenarios(
                     log(f"    [warn] 打开 {scen} 超时（第 {attempt} 次），准备重试...")
             if not goto_ok:
                 log(f"    [err] {scen} 页面多次超时，已跳过")
+                _tick_progress()
                 continue
 
             try:
                 page.wait_for_selector("div.image img", timeout=20000)
             except PlaywrightTimeoutError:
                 log(f"    [warn] {scen} 页面找不到图片元素或加载过慢，跳过")
+                _tick_progress()
                 continue
 
             imgs = page.query_selector_all("div.image img")
             if not imgs:
                 log(f"    [warn] {scen} 无图片，跳过")
+                _tick_progress()
                 continue
 
             alts = []
@@ -93,20 +109,18 @@ def scan_all_scenarios(
                 stats.add_total(len(alts))
 
             batch_map[scen] = alts
-            scanned += 1
-
-            if update_progress:
-                update_progress(scanned, total)
+            collected += 1
+            _tick_progress()
 
             log(f"    [info] {scen} 发现 {len(alts)} 张图片")
 
             # 凑满一批就产出
-            if scanned % batch_size == 0:
+            if collected % batch_size == 0:
                 yield batch_map
                 batch_map = {}
 
         # 最后一批（不足 batch_size）
-        if batch_map:
+        if batch_map and not (stop_event and stop_event.is_set()):
             yield batch_map
 
         browser.close()

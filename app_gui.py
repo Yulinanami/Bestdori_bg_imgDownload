@@ -29,9 +29,6 @@ class BestdoriAppModern(ctk.CTk):
         self.scan_thread = None
         self.download_thread = None
 
-        self.total_scenarios = 0
-        self.scanned_scenarios = 0
-
         self.log_queue = queue.Queue()
 
         self._build_layout()
@@ -80,22 +77,23 @@ class BestdoriAppModern(ctk.CTk):
         speed_frame = ctk.CTkFrame(left, fg_color="transparent")
         speed_frame.pack(fill="x", padx=16, pady=(12, 4))
 
-        ctk.CTkLabel(speed_frame, text="下载并发数", anchor="w").grid(
+        self.lbl_conc_title = ctk.CTkLabel(speed_frame, text="下载并发数", anchor="w")
+        self.lbl_conc_title.grid(
             row=0, column=0, sticky="w"
         )
 
         self.lbl_conc_val = ctk.CTkLabel(speed_frame, text=str(self.conc_var.get()))
         self.lbl_conc_val.grid(row=0, column=1, sticky="e")
 
-        slider_conc = ctk.CTkSlider(
+        self.slider_conc = ctk.CTkSlider(
             speed_frame,
             from_=1,
             to=24,
             number_of_steps=23,
             command=self._on_conc_change,
         )
-        slider_conc.set(self.conc_var.get())
-        slider_conc.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.slider_conc.set(self.conc_var.get())
+        self.slider_conc.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
         speed_frame.grid_columnconfigure(0, weight=1)
 
         hint = ctk.CTkLabel(
@@ -112,22 +110,23 @@ class BestdoriAppModern(ctk.CTk):
         batch_frame = ctk.CTkFrame(left, fg_color="transparent")
         batch_frame.pack(fill="x", padx=16, pady=(12, 4))
 
-        ctk.CTkLabel(batch_frame, text="每批扫描 scenario 数", anchor="w").grid(
+        self.lbl_batch_title = ctk.CTkLabel(batch_frame, text="每批扫描 scenario 数", anchor="w")
+        self.lbl_batch_title.grid(
             row=0, column=0, sticky="w"
         )
 
         self.lbl_batch_val = ctk.CTkLabel(batch_frame, text="20")
         self.lbl_batch_val.grid(row=0, column=1, sticky="e")
 
-        slider_batch = ctk.CTkSlider(
+        self.slider_batch = ctk.CTkSlider(
             batch_frame,
             from_=5,
             to=50,
             number_of_steps=45,
             command=self._on_batch_change,
         )
-        slider_batch.set(self.batch_var.get())
-        slider_batch.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.slider_batch.set(self.batch_var.get())
+        self.slider_batch.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
         batch_frame.grid_columnconfigure(0, weight=1)
 
         # 按钮区域
@@ -147,7 +146,12 @@ class BestdoriAppModern(ctk.CTk):
         )
         self.btn_resume.grid(row=0, column=2, padx=(6, 0), sticky="ew")
 
-        btn_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        self.btn_stop = ctk.CTkButton(
+            btn_frame, text="停止", state="disabled", fg_color="#b53b3b", command=self._stop
+        )
+        self.btn_stop.grid(row=0, column=3, padx=(6, 0), sticky="ew")
+
+        btn_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         # 底部状态 + 进度
         status_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -180,6 +184,27 @@ class BestdoriAppModern(ctk.CTk):
         )
         self.text_log.grid(row=1, column=0, sticky="nsew", padx=16, pady=(4, 16))
 
+        # 记录控件默认颜色，方便禁用时置灰后再恢复
+        self._default_text_colors = {
+            "conc_title": self.lbl_conc_title.cget("text_color"),
+            "conc_val": self.lbl_conc_val.cget("text_color"),
+            "batch_title": self.lbl_batch_title.cget("text_color"),
+            "batch_val": self.lbl_batch_val.cget("text_color"),
+        }
+        self._default_slider_colors = {
+            "fg_color": self.slider_conc.cget("fg_color"),
+            "progress_color": self.slider_conc.cget("progress_color"),
+            "button_color": self.slider_conc.cget("button_color"),
+            "button_hover_color": self.slider_conc.cget("button_hover_color"),
+        }
+        self._disabled_text_color = ("gray50", "gray70")
+        self._disabled_slider_colors = {
+            "fg_color": ("gray30", "gray25"),
+            "progress_color": ("gray45", "gray35"),
+            "button_color": ("gray55", "gray45"),
+            "button_hover_color": ("gray55", "gray45"),
+        }
+
     def log(self, msg: str):
         self.log_queue.put(str(msg))
 
@@ -209,6 +234,44 @@ class BestdoriAppModern(ctk.CTk):
         self.batch_var.set(v)
         self.lbl_batch_val.configure(text=str(v))
 
+    def _set_control_enabled(self, enabled: bool):
+        state = "normal" if enabled else "disabled"
+        slider_colors = (
+            self._default_slider_colors if enabled else self._disabled_slider_colors
+        )
+
+        self.slider_conc.configure(state=state, **slider_colors)
+        self.slider_batch.configure(state=state, **slider_colors)
+
+        self.lbl_conc_title.configure(
+            text_color=(
+                self._default_text_colors["conc_title"]
+                if enabled
+                else self._disabled_text_color
+            )
+        )
+        self.lbl_conc_val.configure(
+            text_color=(
+                self._default_text_colors["conc_val"]
+                if enabled
+                else self._disabled_text_color
+            )
+        )
+        self.lbl_batch_title.configure(
+            text_color=(
+                self._default_text_colors["batch_title"]
+                if enabled
+                else self._disabled_text_color
+            )
+        )
+        self.lbl_batch_val.configure(
+            text_color=(
+                self._default_text_colors["batch_val"]
+                if enabled
+                else self._disabled_text_color
+            )
+        )
+
     def _start(self):
         if (self.scan_thread and self.scan_thread.is_alive()) or (
             self.download_thread and self.download_thread.is_alive()
@@ -226,8 +289,6 @@ class BestdoriAppModern(ctk.CTk):
 
         # 重置统计
         self.stats = DownloadStats()
-        self.total_scenarios = 0
-        self.scanned_scenarios = 0
         self.progressbar.set(0)
 
         # 重置控制变量
@@ -239,6 +300,8 @@ class BestdoriAppModern(ctk.CTk):
         self.btn_start.configure(state="disabled")
         self.btn_pause.configure(state="normal")
         self.btn_resume.configure(state="disabled")
+        self.btn_stop.configure(state="normal")
+        self._set_control_enabled(False)
 
         self.lbl_status.configure(text="运行中…")
 
@@ -287,9 +350,27 @@ class BestdoriAppModern(ctk.CTk):
             self.btn_resume.configure(state="disabled")
             self.lbl_status.configure(text="运行中…")
 
+    def _stop(self):
+        if self.stop_event.is_set():
+            return
+
+        self.stop_event.set()
+        self.pause_event.clear()
+        self.log("[info] 已请求停止，正在等待当前批次收尾")
+        self.lbl_status.configure(text="停止中，等待收尾…")
+
+        try:
+            while True:
+                self.batch_queue.get_nowait()
+        except queue.Empty:
+            pass
+
+        self.batch_queue.put(None)
+        self.btn_pause.configure(state="disabled")
+        self.btn_resume.configure(state="disabled")
+        self.btn_stop.configure(state="disabled")
+
     def _update_progress(self, scanned, total):
-        self.scanned_scenarios = scanned
-        self.total_scenarios = total
         if total > 0:
             self.progressbar.set(scanned / total)
         self.lbl_status.configure(text=f"已扫描 {scanned}/{total} 个 scenario")
@@ -305,12 +386,16 @@ class BestdoriAppModern(ctk.CTk):
                 self.log,
                 self._update_progress,
                 stats=self.stats,
+                stop_event=self.stop_event,
             ):
                 if self.stop_event.is_set():
                     break
                 self.batch_queue.put(batch)
 
-            self.log("=== 扫描完成 ===")
+            if self.stop_event.is_set():
+                self.log("=== 扫描已停止 ===")
+            else:
+                self.log("=== 扫描完成 ===")
         except Exception as e:
             import traceback
 
@@ -323,6 +408,8 @@ class BestdoriAppModern(ctk.CTk):
         self.btn_start.configure(state="normal")
         self.btn_pause.configure(state="disabled")
         self.btn_resume.configure(state="disabled")
+        self.btn_stop.configure(state="disabled")
+        self._set_control_enabled(True)
         self.lbl_status.configure(text="就绪")
 
         # 输出统计
