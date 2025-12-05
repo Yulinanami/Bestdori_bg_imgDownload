@@ -88,8 +88,8 @@ class BestdoriAppModern(ctk.CTk):
         self.slider_conc = ctk.CTkSlider(
             speed_frame,
             from_=1,
-            to=24,
-            number_of_steps=23,
+            to=12,
+            number_of_steps=11,
             command=self._on_conc_change,
         )
         self.slider_conc.set(self.conc_var.get())
