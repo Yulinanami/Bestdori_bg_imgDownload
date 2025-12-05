@@ -18,7 +18,7 @@ class BestdoriAppModern(ctk.CTk):
         self.geometry("1000x640")
 
         self.output_dir = ctk.StringVar(value=os.path.abspath("bestdori_scenarios"))
-        self.conc_var = ctk.IntVar(value=24)
+        self.conc_var = ctk.IntVar(value=8)
         self.batch_var = ctk.IntVar(value=20)
 
         self.pause_event = threading.Event()
@@ -76,22 +76,22 @@ class BestdoriAppModern(ctk.CTk):
         )
         btn_browse.grid(row=1, column=1, padx=(8, 0), pady=(4, 0))
 
-        # 下载速度（并发数）
+        # 下载并发数
         speed_frame = ctk.CTkFrame(left, fg_color="transparent")
         speed_frame.pack(fill="x", padx=16, pady=(12, 4))
 
-        ctk.CTkLabel(speed_frame, text="下载速度（并发数）", anchor="w").grid(
+        ctk.CTkLabel(speed_frame, text="下载并发数", anchor="w").grid(
             row=0, column=0, sticky="w"
         )
 
-        self.lbl_conc_val = ctk.CTkLabel(speed_frame, text="24")
+        self.lbl_conc_val = ctk.CTkLabel(speed_frame, text=str(self.conc_var.get()))
         self.lbl_conc_val.grid(row=0, column=1, sticky="e")
 
         slider_conc = ctk.CTkSlider(
             speed_frame,
             from_=1,
-            to=64,
-            number_of_steps=63,
+            to=24,
+            number_of_steps=23,
             command=self._on_conc_change,
         )
         slider_conc.set(self.conc_var.get())
@@ -100,7 +100,7 @@ class BestdoriAppModern(ctk.CTk):
 
         hint = ctk.CTkLabel(
             speed_frame,
-            text="推荐 16–32，越大越快，但对 Bestdori 服务器压力越大",
+            text="推荐 1-8，越大越快，但对 Bestdori 服务器压力越大，而且会导致下载不稳定",
             font=ctk.CTkFont(size=10),
             text_color=("gray40", "gray70"),
             wraplength=260,

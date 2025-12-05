@@ -133,9 +133,9 @@ def download_worker(
 ):
     """
     独立下载线程：
-      - 自己创建 asyncio 事件循环
-      - 从 batch_queue 里取批次
-      - 对每个批次调用 download_batch
+      自己创建 asyncio 事件循环
+      从 batch_queue 里取批次
+      对每个批次调用 download_batch
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -159,7 +159,7 @@ def download_worker(
                         output_dir,
                         pause_event,
                         log,
-                        stats=stats,  # ✅ 把统计对象传入
+                        stats=stats, 
                     )
                 )
             except Exception as e:

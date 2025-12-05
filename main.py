@@ -1,4 +1,4 @@
-from modern_gui import BestdoriAppModern
+from app_gui import BestdoriAppModern
 
 
 def main():

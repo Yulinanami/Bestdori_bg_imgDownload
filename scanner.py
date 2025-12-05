@@ -1,4 +1,5 @@
 import os
+import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from common import BG_LIST_URL, HEADERS, wait_if_paused_sync
 from stats import DownloadStats
@@ -50,15 +51,30 @@ def scan_all_scenarios(
 
         for scen in scenarios:
             wait_if_paused_sync(pause_event)
+            time.sleep(0.5)  # 每个 scenario 间隔 0.5s
 
             url = f"{BG_LIST_URL}/{scen}"
             log(f"\n[+] 扫描 {scen} -> {url}")
-            page.goto(url, wait_until="domcontentloaded")
+            goto_ok = False
+            for attempt in range(1, 4):
+                try:
+                    page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=45000,
+                    )
+                    goto_ok = True
+                    break
+                except PlaywrightTimeoutError:
+                    log(f"    [warn] 打开 {scen} 超时（第 {attempt} 次），准备重试...")
+            if not goto_ok:
+                log(f"    [err] {scen} 页面多次超时，已跳过")
+                continue
 
             try:
-                page.wait_for_selector("div.image img", timeout=15000)
+                page.wait_for_selector("div.image img", timeout=20000)
             except PlaywrightTimeoutError:
-                log(f"    [warn] {scen} 页面找不到图片元素，跳过")
+                log(f"    [warn] {scen} 页面找不到图片元素或加载过慢，跳过")
                 continue
 
             imgs = page.query_selector_all("div.image img")
