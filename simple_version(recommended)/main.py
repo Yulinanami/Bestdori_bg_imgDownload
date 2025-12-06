@@ -61,6 +61,13 @@ async def download_one(
         return False
 
 
+def print_progress(done: int, total: int, success: int, failed: int, skipped: int):
+    msg = (
+        f"\r进度 {done}/{total} | 成功 {success} | 失败 {failed} | 过滤 {skipped}"
+    )
+    print(msg, end="", flush=True)
+
+
 async def download_batch(
     scenarios,
     last_digits,
@@ -86,15 +93,24 @@ async def download_batch(
         total = len(tasks)
         success = 0
         skipped = 0
+        failed = 0
+        done = 0
+        print_progress(done, total, success, failed, skipped)
+
         for coro in asyncio.as_completed(tasks):
             result = await coro
+            done += 1
             if result == "skip":
                 skipped += 1
             elif result:
                 success += 1
+            else:
+                failed += 1
+            print_progress(done, total, success, failed, skipped)
 
     effective_total = total - skipped
-    return success, effective_total, skipped
+    print()  # 换行，避免进度覆盖后续输出
+    return success, effective_total, skipped, failed
 
 
 def prompt_range(default_start: int, default_end: int) -> tuple[int, int]:
@@ -156,7 +172,7 @@ def main():
     print(f"输出目录: {output}")
     print(f"并发: {concurrency}，按 scenario 分目录: {split_by_scenario}")
 
-    success, total, skipped = asyncio.run(
+    success, total, skipped, failed = asyncio.run(
         download_batch(
             scenarios,
             last_digits,
@@ -167,7 +183,7 @@ def main():
     )
 
     print(
-        f"完成: {success}/{total} 成功，失败 {total - success}，占位过滤 {skipped}（不计入总数）"
+        f"完成: {success}/{total} 成功，失败 {failed}，占位过滤 {skipped}（不计入总数）"
     )
 
 
