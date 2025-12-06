@@ -6,10 +6,10 @@ from pathlib import Path
 
 
 BASE_URL = "https://bestdori.com/assets/jp/bg"
-# 缺失图片的响应内容大小通常固定14,084 bytes，用精确长度/哈希过滤
+# 缺失图片的响应内容大小通常固定14,084 bytes
 KNOWN_PLACEHOLDER_SIZES = {14084}
 KNOWN_PLACEHOLDER_HASHES: set[str] = set()
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60, connect=15)
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90, connect=15)
 MAX_RETRIES = 4
 
 
@@ -26,6 +26,7 @@ def build_url(scenario_number: int, last_digit: int) -> str:
 
 async def download_one(
     session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
     scenario_number: int,
     last_digit: int,
     output_root: Path,
@@ -45,29 +46,30 @@ async def download_one(
         try:
             # 小的等待抖动，降低瞬时并发对服务器的压力
             await asyncio.sleep(0.2 * attempt)
-            async with session.get(url, timeout=REQUEST_TIMEOUT) as resp:
-                if resp.status != 200:
-                    raise aiohttp.ClientResponseError(
-                        resp.request_info, resp.history, status=resp.status
-                    )
+            async with sem:
+                async with session.get(url, timeout=REQUEST_TIMEOUT) as resp:
+                    if resp.status != 200:
+                        raise aiohttp.ClientResponseError(
+                            resp.request_info, resp.history, status=resp.status
+                        )
 
-                content = await resp.read()
-                size = len(content)
-                sha256 = hashlib.sha256(content).hexdigest()
+                    content = await resp.read()
+                    size = len(content)
+                    sha256 = hashlib.sha256(content).hexdigest()
 
-                if (
-                    size in KNOWN_PLACEHOLDER_SIZES
-                    or sha256 in KNOWN_PLACEHOLDER_HASHES
-                ):
-                    print(
-                        f"[skip] {scenario_number}/{filename} 命中占位过滤 (size={size})"
-                    )
-                    return "skip"
+                    if (
+                        size in KNOWN_PLACEHOLDER_SIZES
+                        or sha256 in KNOWN_PLACEHOLDER_HASHES
+                    ):
+                        print(
+                            f"[skip] {scenario_number}/{filename} 命中占位过滤 (size={size})"
+                        )
+                        return "skip"
 
-                with open(save_path, "wb") as f:
-                    f.write(content)
+                    with open(save_path, "wb") as f:
+                        f.write(content)
 
-                return True
+                    return True
         except (asyncio.TimeoutError, aiohttp.ClientError) as e:
             if attempt >= MAX_RETRIES:
                 print(
@@ -100,12 +102,14 @@ async def download_batch(
     async with aiohttp.ClientSession(
         connector=connector, timeout=REQUEST_TIMEOUT
     ) as session:
+        sem = asyncio.Semaphore(concurrency)
         tasks = []
         for scen in scenarios:
             for d in last_digits:
                 tasks.append(
                     download_one(
                         session,
+                        sem,
                         scen,
                         d,
                         output,
@@ -166,7 +170,7 @@ def main():
     default_start = 0
     default_end = 123
     default_output = "./bg_downloads"
-    concurrency = 6
+    concurrency = 12
 
     print("按命名规则下载 Bestdori scenario 背景图（无需扫描网页）")
     print("默认起止为 0-5，可按提示输入覆盖。")
@@ -174,10 +178,8 @@ def main():
         f"已启用占位过滤：长度 {sorted(KNOWN_PLACEHOLDER_SIZES)} bytes + 哈希 {len(KNOWN_PLACEHOLDER_HASHES)} 个。"
     )
 
-    # 交互式选择起止范围，回车可用默认值
     start, end = prompt_range(default_start, default_end)
     scenarios = list(range(start, end + 1))
-
     choice = input("按 scenario 分目录保存? (默认关闭，输入Y/y开启): ").strip().lower()
     split_by_scenario = choice == "y"
 
@@ -189,7 +191,7 @@ def main():
     output = Path(os.path.abspath(output_path))
     output.mkdir(parents=True, exist_ok=True)
 
-    last_digits = list(range(10))  # 0-9
+    last_digits = list(range(10)) 
 
     print(f"准备下载 scenario {scenarios}，每个尝试文件 bg0###(0-9).png")
     print(f"输出目录: {output}")
