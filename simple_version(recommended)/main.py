@@ -10,6 +10,8 @@ BASE_URL = "https://bestdori.com/assets/jp/bg"
 # 缺失图片的响应内容大小通常固定14,084 bytes，用精确长度/哈希过滤
 KNOWN_PLACEHOLDER_SIZES = {14084}
 KNOWN_PLACEHOLDER_HASHES: set[str] = set()
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90, connect=15)
+MAX_RETRIES = 3
 
 
 def build_filename(scenario_number: int, last_digit: int) -> str:
@@ -40,25 +42,45 @@ async def download_one(
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / filename
 
-    try:
-        async with session.get(url) as resp:
-            if resp.status != 200:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            async with session.get(url, timeout=REQUEST_TIMEOUT) as resp:
+                if resp.status != 200:
+                    raise aiohttp.ClientResponseError(
+                        resp.request_info, resp.history, status=resp.status
+                    )
+
+                content = await resp.read()
+                size = len(content)
+                sha256 = hashlib.sha256(content).hexdigest()
+
+                if (
+                    size in KNOWN_PLACEHOLDER_SIZES
+                    or sha256 in KNOWN_PLACEHOLDER_HASHES
+                ):
+                    print(
+                        f"[skip] {scenario_number}/{filename} 命中占位过滤 (size={size})"
+                    )
+                    return "skip"
+
+                with open(save_path, "wb") as f:
+                    f.write(content)
+
+                return True
+        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+            if attempt >= MAX_RETRIES:
+                print(
+                    f"[warn] {scenario_number}/{filename} 失败: {e} (尝试 {attempt}/{MAX_RETRIES})"
+                )
                 return False
-
-            content = await resp.read()
-            size = len(content)
-            sha256 = hashlib.sha256(content).hexdigest()
-
-            if size in KNOWN_PLACEHOLDER_SIZES or sha256 in KNOWN_PLACEHOLDER_HASHES:
-                print(f"[skip] {scenario_number}/{filename} 命中占位过滤 (size={size})")
-                return "skip"
-
-            with open(save_path, "wb") as f:
-                f.write(content)
-
-            return True
-    except Exception:
-        return False
+            await asyncio.sleep(1.5 * attempt)
+        except Exception as e:
+            if attempt >= MAX_RETRIES:
+                print(
+                    f"[warn] {scenario_number}/{filename} 失败: {e} (尝试 {attempt}/{MAX_RETRIES})"
+                )
+                return False
+            await asyncio.sleep(1.5 * attempt)
 
 
 def print_progress(done: int, total: int, success: int, failed: int, skipped: int):
@@ -74,7 +96,9 @@ async def download_batch(
     split_by_scenario: bool,
 ):
     connector = aiohttp.TCPConnector(limit=concurrency)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    async with aiohttp.ClientSession(
+        connector=connector, timeout=REQUEST_TIMEOUT
+    ) as session:
         tasks = []
         for scen in scenarios:
             for d in last_digits:
