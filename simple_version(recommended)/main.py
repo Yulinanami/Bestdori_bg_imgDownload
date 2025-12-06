@@ -1,17 +1,16 @@
 import asyncio
 import os
-from pathlib import Path
 import hashlib
-
 import aiohttp
+from pathlib import Path
 
 
 BASE_URL = "https://bestdori.com/assets/jp/bg"
 # 缺失图片的响应内容大小通常固定14,084 bytes，用精确长度/哈希过滤
 KNOWN_PLACEHOLDER_SIZES = {14084}
 KNOWN_PLACEHOLDER_HASHES: set[str] = set()
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90, connect=15)
-MAX_RETRIES = 3
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60, connect=15)
+MAX_RETRIES = 4
 
 
 def build_filename(scenario_number: int, last_digit: int) -> str:
@@ -44,6 +43,8 @@ async def download_one(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
+            # 小的等待抖动，降低瞬时并发对服务器的压力
+            await asyncio.sleep(0.2 * attempt)
             async with session.get(url, timeout=REQUEST_TIMEOUT) as resp:
                 if resp.status != 200:
                     raise aiohttp.ClientResponseError(
@@ -165,7 +166,7 @@ def main():
     default_start = 0
     default_end = 123
     default_output = "./bg_downloads"
-    concurrency = 16
+    concurrency = 6
 
     print("按命名规则下载 Bestdori scenario 背景图（无需扫描网页）")
     print("默认起止为 0-5，可按提示输入覆盖。")
