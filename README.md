@@ -4,15 +4,42 @@ Bestdori 场景背景图下载工具。
 
 ## 主要功能
 
-本工具用来批量下载 [Bestdori](https://bestdori.com) 数据站中的 BanG Dream! 背景图（scenario）。
+这个工具用来批量下载 [Bestdori](https://bestdori.com) 资源库中的背景图（scenario）。
 
-## 注意
+## 安装
 
-simple_version 不需要浏览器内核，开箱即用，启动程序后一路回车即可。
+```bash
+# 克隆
+git clone https://github.com/Yulinanami/Bestdori_BG_ImgDownload
+cd Bestdori_BG_ImgDownload
 
-gui_scan_version 模拟浏览器进行扫描，需要安装浏览器内核（不推荐）。
+# 创建虚拟环境
+python -m venv .venv
+# 或
+python3 -m venv .venv
 
-## 使用方法请看相应版本文件夹下的README
+# 激活虚拟环境
+.\.venv\Scripts\activate
+# 或
+source .venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+## 使用
+
+```bash
+python main.py
+```
+
+运行后按提示输入：
+
+1) 起始/结束 scenario 编号（默认 0-123，可交换顺序）。  
+2) 是否按 scenario 分目录保存（默认否，输入 Y/y 开启）。  
+3) 输出目录。
+
+或者直接一路回车即可。
 
 ## 📄 许可证
 
