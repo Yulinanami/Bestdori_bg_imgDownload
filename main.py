@@ -1,6 +1,6 @@
 import asyncio
-import os
-import hashlib
+
+
 import aiohttp
 from pathlib import Path
 
@@ -8,7 +8,7 @@ from pathlib import Path
 BASE_URL = "https://bestdori.com/assets/jp/bg"
 # 缺失图片的响应内容大小通常固定14,084 bytes
 KNOWN_PLACEHOLDER_SIZES = {14084}
-KNOWN_PLACEHOLDER_HASHES: set[str] = set()
+
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90, connect=15)
 MAX_RETRIES = 4
 
@@ -18,9 +18,8 @@ def build_filename(scenario_number: int, last_digit: int) -> str:
     return f"bg0{scen_str}{last_digit}.png"
 
 
-def build_url(scenario_number: int, last_digit: int) -> str:
+def build_url(scenario_number: int, filename: str) -> str:
     scen_name = f"scenario{scenario_number}"
-    filename = build_filename(scenario_number, last_digit)
     return f"{BASE_URL}/{scen_name}_rip/{filename}"
 
 
@@ -32,8 +31,8 @@ async def download_one(
     output_root: Path,
     split_by_scenario: bool,
 ) -> str | bool:
-    url = build_url(scenario_number, last_digit)
     filename = build_filename(scenario_number, last_digit)
+    url = build_url(scenario_number, filename)
     if split_by_scenario:
         save_dir = output_root / f"scenario{scenario_number}"
     else:
@@ -55,12 +54,8 @@ async def download_one(
 
                     content = await resp.read()
                     size = len(content)
-                    sha256 = hashlib.sha256(content).hexdigest()
 
-                    if (
-                        size in KNOWN_PLACEHOLDER_SIZES
-                        or sha256 in KNOWN_PLACEHOLDER_HASHES
-                    ):
+                    if size in KNOWN_PLACEHOLDER_SIZES:
                         print(
                             f"[skip] {scenario_number}/{filename} 命中占位过滤 (size={size})"
                         )
@@ -174,12 +169,10 @@ def main():
 
     print("按命名规则下载 Bestdori scenario 背景图（无需扫描网页）")
     print("默认起止为 0-5，可按提示输入覆盖。")
-    print(
-        f"已启用占位过滤：长度 {sorted(KNOWN_PLACEHOLDER_SIZES)} bytes + 哈希 {len(KNOWN_PLACEHOLDER_HASHES)} 个。"
-    )
+    print(f"已启用占位过滤：长度 {sorted(KNOWN_PLACEHOLDER_SIZES)} bytes。")
 
     start, end = prompt_range(default_start, default_end)
-    scenarios = list(range(start, end + 1))
+    scenarios = range(start, end + 1)
     choice = input("按 scenario 分目录保存? (默认关闭，输入Y/y开启): ").strip().lower()
     split_by_scenario = choice == "y"
 
@@ -188,10 +181,10 @@ def main():
 
     output_input = input(f"请输入输出目录（默认 {default_output}）: ").strip()
     output_path = output_input or default_output
-    output = Path(os.path.abspath(output_path))
+    output = Path(output_path).resolve()
     output.mkdir(parents=True, exist_ok=True)
 
-    last_digits = list(range(10)) 
+    last_digits = range(10)
 
     print(f"准备下载 scenario {scenarios}，每个尝试文件 bg0###(0-9).png")
     print(f"输出目录: {output}")
