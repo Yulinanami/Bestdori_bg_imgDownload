@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build Linux
 
 on:
   release:
@@ -9,18 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            build_name: Bestdori_BG_Windows_x64
-            asset_path: dist/Bestdori_BG_Windows_x64.exe
-          - os: ubuntu-20.04
-            build_name: Bestdori_BG_Linux_x64
-            asset_path: dist/Bestdori_BG_Linux_x64
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -39,12 +30,12 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --onefile --name ${{ matrix.build_name }} --clean main.py
+          pyinstaller --onefile --name Bestdori_BG_Linux_x64 --clean main.py
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'release'
         with:
-          files: ${{ matrix.asset_path }}
+          files: dist/Bestdori_BG_Linux_x64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
